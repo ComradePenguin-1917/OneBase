@@ -1,6 +1,7 @@
 #include "onebase/storage/index/b_plus_tree_iterator.h"
-#include <functional>
-#include "onebase/common/exception.h"
+#include <stdexcept>
+#include "onebase/buffer/buffer_pool_manager.h"
+#include "onebase/storage/page/b_plus_tree_leaf_page.h"
 
 namespace onebase {
 
@@ -17,14 +18,48 @@ auto BPLUSTREE_ITERATOR_TYPE::IsEnd() const -> bool {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 auto BPLUSTREE_ITERATOR_TYPE::operator*() -> const std::pair<KeyType, ValueType> & {
-  // TODO(student): Dereference the iterator
-  throw NotImplementedException("BPlusTreeIterator::operator*");
+  if (IsEnd() || bpm_ == nullptr) {
+    throw std::runtime_error("BPlusTreeIterator::operator*: invalid iterator");
+  }
+
+  Page *page = bpm_->FetchPage(page_id_);
+  if (page == nullptr) {
+    throw std::runtime_error("BPlusTreeIterator::operator*: page fetch failed");
+  }
+
+  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+  auto *leaf_page = reinterpret_cast<LeafPage *>(page->GetData());
+
+  current_.first = leaf_page->KeyAt(index_);
+  current_.second = leaf_page->ValueAt(index_);
+
+  bpm_->UnpinPage(page_id_, false);
+  return current_;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 auto BPLUSTREE_ITERATOR_TYPE::operator++() -> BPlusTreeIterator & {
-  // TODO(student): Advance the iterator to the next key-value pair
-  throw NotImplementedException("BPlusTreeIterator::operator++");
+  if (IsEnd() || bpm_ == nullptr) {
+    return *this;
+  }
+
+  Page *page = bpm_->FetchPage(page_id_);
+  if (page == nullptr) {
+    page_id_ = INVALID_PAGE_ID;
+    return *this;
+  }
+
+  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+  auto *leaf_page = reinterpret_cast<LeafPage *>(page->GetData());
+
+  index_++;
+  if (index_ >= leaf_page->GetSize()) {
+    page_id_ = leaf_page->GetNextPageId();
+    index_ = 0;
+  }
+
+  bpm_->UnpinPage(page_id_, false);
+  return *this;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

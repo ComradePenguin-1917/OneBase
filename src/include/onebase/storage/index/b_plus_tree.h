@@ -42,6 +42,14 @@ class BPlusTree : public Index {
   page_id_t root_page_id_{INVALID_PAGE_ID};
   int leaf_max_size_;
   int internal_max_size_;
+
+  void Split(LeafPage *leaf_page, page_id_t leaf_page_id);
+  void SplitInternal(InternalPage *internal_page, page_id_t internal_page_id);
+  void InsertIntoParent(page_id_t parent_id, page_id_t old_child_id,
+                        const KeyType &key, page_id_t new_child_id);
+  auto FindLeafPage(const KeyType &key) -> page_id_t;
+  void CoalesceOrRedistribute(LeafPage *leaf_page, page_id_t leaf_page_id);
+  void CoalesceOrRedistributeInternal(InternalPage *internal_page, page_id_t internal_page_id);
 };
 
 }  // namespace onebase
